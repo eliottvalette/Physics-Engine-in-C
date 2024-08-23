@@ -1,3 +1,6 @@
+// gcc -o physics_engine_naive physics_engine_naive.c
+// ./physics_engine_naive
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,7 +8,7 @@
 #include <math.h>
 
 #define NUM_PARTICLES 2
-#define NUM_RIGID_BODIES 1
+#define NUM_RIGID_BODIES 2
 
 // Two dimensional vector.
 typedef struct {
@@ -52,7 +55,7 @@ void InitializeParticles() {
 }
 
 Vector2 ComputeForce(Particle *particle) {
-    return (Vector2){0, particle->mass * -9.81};
+    return (Vector2){0, particle->mass * -9.81}; // apply only on y
 }
 
 void CalculateBoxInertia(BoxShape *boxShape) {
@@ -65,22 +68,23 @@ void CalculateBoxInertia(BoxShape *boxShape) {
 void InitializeRigidBodies() {
     for (int i = 0; i < NUM_RIGID_BODIES; ++i) {
         RigidBody *rigidBody = &rigidBodies[i];
-        rigidBody->position = (Vector2){arc4random_uniform(50), arc4random_uniform(50)};
-        rigidBody->angle = arc4random_uniform(360)/360.f * M_PI * 2;
-        rigidBody->linearVelocity = (Vector2){0, 0};
-        rigidBody->angularVelocity = 0;
+        rigidBody->position = (Vector2){arc4random_uniform(50), arc4random_uniform(50)}; // initialize random position
+        rigidBody->angle = arc4random_uniform(360)/360.f * M_PI * 2; // initialize random angle
+        rigidBody->linearVelocity = (Vector2){0, 0}; // initialize no velocity
+        rigidBody->angularVelocity = 0; // and no angular velocity
         
         BoxShape shape;
         shape.mass = 10;
-        shape.width = 1 + arc4random_uniform(2);
-        shape.height = 1 + arc4random_uniform(2);
+        shape.width = 50 + arc4random_uniform(100);
+        shape.height = 25 + arc4random_uniform(50);
         CalculateBoxInertia(&shape);
+
         rigidBody->shape = shape;
     }
 }
 
 void ComputeForceAndTorque(RigidBody *rigidBody) {
-    Vector2 f = (Vector2){0, 100};
+    Vector2 f = (Vector2){arc4random_uniform(50), arc4random_uniform(100)}; // apply an upward and right force
     rigidBody->force = f;
     Vector2 r = (Vector2){rigidBody->shape.width / 2, rigidBody->shape.height / 2};
     rigidBody->torque = r.x * f.y - r.y * f.x;
@@ -90,13 +94,13 @@ void WriteSimulationData(FILE *file, float time, int simu_index){
     if (simu_index == 0){
         for (int i = 0; i < NUM_PARTICLES; ++i) {
         Particle *particle = &particles[i];
-        fprintf(file, "%.2f,Particle,%d,%.2f,%.2f,\n", time, i, particle->position.x, particle->position.y);
+        fprintf(file, "%.2f,Particle,%d,%.2f,%.2f,%.2f,,,\n", time, i, particle->position.x, particle->position.y, particle->mass);
     }
 
     } else if (simu_index == 1){
         for (int i = 0; i < NUM_RIGID_BODIES; ++i) {
             RigidBody *rigidBody = &rigidBodies[i];
-            fprintf(file, "%.2f,RigidBody,%d,%.2f,%.2f,%.2f\n", time, i, rigidBody->position.x, rigidBody->position.y, rigidBody->angle);
+            fprintf(file, "%.2f,RigidBody,%d,%.2f,%.2f,%.2f, %.2f, %.2f, %.2f\n", time, i, rigidBody->position.x, rigidBody->position.y, rigidBody->shape.mass, rigidBody->angle, rigidBody->shape.width, rigidBody->shape.height);
         }
     }
 }
@@ -108,11 +112,11 @@ void RunSimulation(int simu_index) {
         exit(1);
     }
 
-    fprintf(file, "Time,Object Type,Object ID,Position X,Position Y,Angle\n");
+    fprintf(file, "Time,Object Type,Object ID,Position X,Position Y,Mass,Angle,Width,Height\n");
 
     float totalSimulationTime = 10; // The simulation will run for 10 seconds.
     float currentTime = 0; // This accumulates the time that has passed.
-    float dt = 1; // Each step will take one second.
+    float dt = 0.1; // Each step will take one second.
     
     InitializeParticles();
     InitializeRigidBodies();
@@ -153,17 +157,11 @@ void RunSimulation(int simu_index) {
 }
 
 int main() {
-    printf("Simulating Particles or RigidBodies ?\n");
-    char simu_object[20];
+    printf("Simulating Particles(0) or RigidBodies(1) ?\n");
     int simu_index = -1;
-    scanf("%s", simu_object);
     do {
-        if (strcmp(simu_object, "Particles") == 0) {
-            simu_index = 0;
-        } else if (strcmp(simu_object, "RigidBodies") == 0) {
-            simu_index = 1;
-        };
-    } while (simu_index == -1);
+        scanf("%d", &simu_index);
+    } while (simu_index != 0 && simu_index != 1);
     printf("Running simulation...\n");
     RunSimulation(simu_index);
     return 0;
