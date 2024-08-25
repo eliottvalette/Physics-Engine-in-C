@@ -11,7 +11,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
-FPS = 200.0  # Frames per second
+FPS = 600.0  # Frames per second
 
 # Load the CSV file into a DataFrame
 simulation_df = pd.read_csv("simulation_data.csv")
