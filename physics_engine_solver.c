@@ -1,267 +1,207 @@
-// gcc -o physics_engine_solver physics_engine_solver.c
-// ./physics_engine_solver
+// gcc -o physics_engine_solver_2 physics_engine_solver_2.c 
+// ./physics_engine_solver_2
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <math.h>
 
-// Two dimensional vector.
+#define SUB_STEPS 1
+#define NUMBER_STEPS 200
+#define NUMBER_OF_OBJECTS 300
+#define BALL_RADIUS 12.0f
+
+
+// Two-dimensional vector.
 typedef struct {
     float x;
     float y;
 } Vector2;
 
-typedef struct {
-    float x;
-    float y;
-    float z;
-} Vector3;
-
-typedef struct VerletObject VerletObject; // Forward declaration for function pointers
-
-typedef void (*UpdateFunc)(VerletObject *obj, float dt);
-typedef void (*AccelerateFunc)(VerletObject *obj, Vector2 a);
-typedef Vector2 (*GetVelocityFunc)(VerletObject *obj, float dt);
-
 // Verlet Object and its properties
-struct VerletObject{
+typedef struct {
     Vector2 position;
     Vector2 position_last;
     Vector2 acceleration;
     float radius;
-    int color;
-    // Function pointers
-    UpdateFunc update;
-    AccelerateFunc accelerate;
-    GetVelocityFunc getVelocity;
-};
+    int color[3];
+} VerletObject;
 
-void objectUpdate(VerletObject *obj, float dt) {
-    // Calculate displacement from last position
-    Vector2 displacement = {
-        obj->position.x - obj->position_last.x,
-        obj->position.y - obj->position_last.y
-    };
-
-    // Store the current position before updating
-    Vector2 current_position = obj->position;
-
-    // Update position using Verlet integration formula
-    obj->position.x += displacement.x + obj->acceleration.x * (dt * dt);
-    obj->position.y += displacement.y + obj->acceleration.y * (dt * dt);
-
-    // Update the last position to the previous position
-    obj->position_last = current_position;
-
-    // Reset acceleration for the next update
-    obj->acceleration = (Vector2){0.0f, 0.0f};
-}
-
-
-void accelerate(VerletObject * obj, Vector2 a){
-    obj->acceleration.x += a.x;
-    obj->acceleration.y += a.y;
-};
-
-void setVelocity(VerletObject * obj, Vector2 v, float dt){
-    obj->position_last.x = obj->position.x - (v.x * dt);
-    obj->position_last.y = obj->position.y - (v.y * dt);
-}
-
-void addVelocity(VerletObject * obj, Vector2 v, float dt){
-    obj->position_last.x -= v.x * dt;
-    obj->position_last.y -= v.y * dt;
-}
-
-Vector2 getVelocity(VerletObject * obj, float dt){
-    float x = (obj->position.x - obj->position_last.x) / dt;
-    float y = (obj->position.y - obj->position_last.y) / dt;
-    return (Vector2){x, y};
-}
-
-
-// Simulation functions
 typedef struct {
     float time;
     float frame_dt;
     unsigned int sub_steps;
     Vector2 gravity;
-    Vector2 constraint_center;
-    float constraint_radius;
     VerletObject *objects;
     size_t object_count;
 } Solver;
 
-// Calculates the time step for each simulation sub-step
-float getStepDt(Solver *solver) {
-    return solver->frame_dt / (float)(solver->sub_steps);
+// Simplified update function using Verlet integration
+void objectUpdate(VerletObject *obj, float dt) {
+    // Calculate velocity
+    Vector2 velocity = {
+        obj->position.x - obj->position_last.x,
+        obj->position.y - obj->position_last.y
+    };
+
+    // Save position
+    obj->position_last = obj->position;
+
+    // Update position using Verlet integration formula
+    obj->position.x += velocity.x + obj->acceleration.x * (dt * dt);
+    obj->position.y += velocity.y + obj->acceleration.y * (dt * dt);
+
+    // Reset acceleration
+    obj->acceleration = (Vector2){0.0f, 0.0f};
 }
 
-// Sets the simulation update rate by modifying frame_dt in the solver
-void setSimulationUpdateRate(Solver *solver, unsigned int rate) {
-    solver->frame_dt = 1.0f / rate;
+void applyAcceleration(Solver *solver, Vector2 a) { // Apply acceleration to all objects
+    for (size_t i = 0; i < solver->object_count; i++) {
+        solver->objects[i].acceleration.x += a.x;
+        solver->objects[i].acceleration.y += a.y;
+    }
 }
 
-// Sets the constraint center and radius in the solver
-void setConstraint(Solver *solver, Vector2 position, float radius) {
-    solver->constraint_center = position;
-    solver->constraint_radius = radius;
-}
-
-// Sets the velocity of a specific object
-void setObjectVelocity(Solver *solver, VerletObject *obj, Vector2 v) {
-    float dt = getStepDt(solver);
-    setVelocity(obj, v, dt);
-}
-
-// Gets the constraint as a Vector3
-Vector3 getConstraint(Solver *solver) {
-    return (Vector3){solver->constraint_center.x, solver->constraint_center.y, solver->constraint_radius};
-}
-
-// Applies gravity to all objects in the solver
 void applyGravity(Solver *solver) {
-    for (size_t i = 0; i < solver->object_count; i++) {
-        solver->objects[i].accelerate(&(solver->objects[i]), solver->gravity);
-        printf("Applying gravity: Object %zu - Acceleration: (%f, %f)\n",
-               i, solver->objects[i].acceleration.x, solver->objects[i].acceleration.y);
-    }
+    applyAcceleration(solver, solver->gravity);
 }
 
-// Updates all objects in the solver
-void updateObjects(Solver *solver, float dt) {
-    for (size_t i = 0; i < solver->object_count; i++) {
-        solver->objects[i].update(&(solver->objects[i]), dt);
-    }
+void applyForce(Solver *solver, Vector2 force){
+    applyAcceleration(solver, force);
 }
 
-void checkCollisions(Solver *solver, float dt) {
-    const float response_coef = 0.75f; // Coefficient of restitution (how 'bouncy' collisions are)
-    
+void apply_constraint(Solver *solver) {
     for (size_t i = 0; i < solver->object_count; i++) {
-        VerletObject *obj1 = &solver->objects[i];
-        for (size_t j = i + 1; j < solver->object_count; j++) {
-            VerletObject *obj2 = &solver->objects[j];
+        VerletObject *obj = &solver->objects[i];
+        float circle_radius = 350.0f;
+        Vector2 circle_center = {0.0f, 0.0f};
 
-            // Calculate the vector between the objects
-            Vector2 v = {obj2->position.x - obj1->position.x, obj2->position.y - obj1->position.y};
-            float dist2 = v.x * v.x + v.y * v.y;
-            float min_dist = obj1->radius + obj2->radius;
+        // Vector from the circle center to the object
+        Vector2 to_obj;
+        to_obj.x = obj->position.x - circle_center.x;
+        to_obj.y = obj->position.y - circle_center.y;
 
-            // Check if the objects are overlapping
-            if (dist2 < min_dist * min_dist) {
-                float dist = sqrtf(dist2);
-                if (dist == 0.0f) dist = 0.01f; // Avoid division by zero
 
-                // Normalize the vector
-                Vector2 n = {v.x / dist, v.y / dist};
+        float dist = sqrt(to_obj.x * to_obj.x + to_obj.y * to_obj.y);
 
-                // Mass ratios (assuming mass is proportional to area)
-                float mass_ratio_1 = obj1->radius / (obj1->radius + obj2->radius);
-                float mass_ratio_2 = obj2->radius / (obj1->radius + obj2->radius);
+        // Check if the object is outside the allowed circle
+        float max_distance = circle_radius - obj->radius;
+        if  (dist > max_distance) {
+            // Normalize the to_obj vector to get the direction
+            Vector2 to_obj_norm;
+            to_obj_norm.x = to_obj.x / dist;
+            to_obj_norm.y = to_obj.y / dist;
 
-                // Calculate the displacement needed to resolve the collision
-                float delta = 0.5f * response_coef * (dist - min_dist);
+            // Correct the position to be on the boundary
+            obj->position.x = circle_center.x + to_obj_norm.x * max_distance;
+            obj->position.y = circle_center.y + to_obj_norm.y * max_distance;            
+        };
 
-                // Adjust positions
-                obj1->position.x -= n.x * (mass_ratio_2 * delta);
-                obj1->position.y -= n.y * (mass_ratio_2 * delta);
-                obj2->position.x += n.x * (mass_ratio_1 * delta);
-                obj2->position.y += n.y * (mass_ratio_1 * delta);
+    };
+};
+
+void checkCollisions(Solver *solver, float dt){
+        const float response_coef = 0.75f;
+        // Iterate on all objects
+        for (unsigned int i = 0; i < solver->object_count; ++i) {
+            VerletObject *obj_1 = &solver->objects[i];
+            // Iterate on object involved in new collision pairs
+            for (unsigned int k = i + 1; k < solver->object_count; ++k) {
+                VerletObject *obj_2 = &solver->objects[k];
+                const Vector2 v = {obj_1->position.x - obj_2->position.x, obj_1->position.y - obj_2->position.y};
+                const float        dist2    = v.x * v.x + v.y * v.y;
+                const float        min_dist = obj_1->radius + obj_2->radius;
+                // Check overlapping
+                if (dist2 < min_dist * min_dist) {
+                    const float dist = sqrt(dist2);
+                    const Vector2 n  = {v.x / dist, v.y / dist};
+                    const float mass_ratio_1 = obj_1->radius / (obj_1->radius + obj_2->radius);
+                    const float mass_ratio_2 = obj_2->radius / (obj_1->radius + obj_2->radius);
+                    const float delta        = 0.5f * response_coef * (dist - min_dist);
+                    // Update positions
+                    obj_1->position.x -= n.x * (mass_ratio_2 * delta);
+                    obj_1->position.y -= n.y * (mass_ratio_2 * delta);
+
+                    obj_2->position.x += n.x * (mass_ratio_1 * delta);
+                    obj_2->position.y += n.y * (mass_ratio_1 * delta);
             }
         }
     }
 }
 
-void applyConstraint(Solver *solver) {
-    for (size_t i = 0; i < solver->object_count; i++) {
-        VerletObject *obj = &solver->objects[i];
-
-        // Vector from object to constraint center
-        Vector2 v = {obj->position.x - solver->constraint_center.x, obj->position.y - solver->constraint_center.y};
-        float dist = sqrtf(v.x * v.x + v.y * v.y);
-
-        // Check if the object is outside the constraint circle
-        if (dist > (solver->constraint_radius - obj->radius)) {
-            // Normalize the vector
-            Vector2 n = {v.x / dist, v.y / dist};
-
-            // Move the object back to the circle's boundary
-            obj->position.x = solver->constraint_center.x + n.x * (solver->constraint_radius - obj->radius);
-            obj->position.y = solver->constraint_center.y + n.y * (solver->constraint_radius - obj->radius);
-        }
-    }
-}
-
-// Updates the simulation state
+// Update the simulation state
 void simuUpdate(Solver *solver) {
-    solver->time += solver->frame_dt;
-    const float step_dt = getStepDt(solver);
-    for (unsigned int i = 0; i < solver->sub_steps; i++) {
-        applyGravity(solver);
-        checkCollisions(solver, step_dt);
-        applyConstraint(solver);
-        updateObjects(solver, step_dt);
-    }
-}
+    const float step_dt = solver->frame_dt / solver->sub_steps;
 
-void WriteSimulationData(FILE *file, float time, Solver *solver){
+    for (unsigned int i = 0; i < solver->sub_steps; i++) {
+        // Apply gravity
+        applyGravity(solver);
+        applyForce(solver, (Vector2){0.0f, 0.0f});
+        checkCollisions(solver, step_dt);
+        apply_constraint(solver);
+
+        // Update all objects
+        for (size_t j = 0; j < solver->object_count; j++) {
+            objectUpdate(&solver->objects[j], step_dt);
+        };
+    };
+    solver->time += solver->frame_dt;
+};
+
+// Function to write simulation data to a CSV file
+void WriteSimulationData(FILE *file, float time, Solver *solver) {
     for (size_t i = 0; i < solver->object_count; i++) {
         VerletObject *obj = &solver->objects[i];
-        fprintf(file, "%.2f, RainbowParticles, %zu, %.2f, %.2f\n", time, i, obj->position.x, obj->position.y);
-    }
-}
-
+        fprintf(file, "%.2f, RainbowParticles, %zu, %.2f, %.2f, %.2f,%d,%d,%d\n",
+                time, i, obj->position.x, obj->position.y, obj->radius, obj->color[0], obj->color[1], obj->color[2]);
+    };
+};
 
 int main() {
     // Initialize a Solver
     Solver solver;
     solver.time = 0.0f;
-    solver.frame_dt = 1.0f / 5.0f; // 5 FPS
-    solver.sub_steps = 1;
+    solver.frame_dt = 1.0f / 10.0f; // FPS
+    solver.sub_steps = SUB_STEPS;
     solver.gravity = (Vector2){0.0f, -9.8f}; // Gravity
+    solver.object_count = NUMBER_OF_OBJECTS;
 
-    // Assign the object to the solver
-    solver.object_count = 1;
+    // Allocate memory for objects
     solver.objects = malloc(solver.object_count * sizeof(VerletObject));
+    if (!solver.objects) {
+        printf("Memory allocation failed!\n");
+        return 1;
+    };
 
-    for (size_t i = 0; i < solver.object_count; i++) {
-        solver.objects[i].position = (Vector2){10.0f + i * 10.0f, 20.0f + i * 10.0f};
+
+    for (unsigned int i = 0; i < solver.object_count; i++){
+        // Initialize the object
+        solver.objects[i].position = (Vector2){-200.0f + arc4random_uniform(400), -200.0f + arc4random_uniform(400)};
         solver.objects[i].position_last = solver.objects[i].position;
         solver.objects[i].acceleration = (Vector2){0.0f, 0.0f};
-        solver.objects[i].radius = 5.0f;
-        solver.objects[i].color = 0xFFFFFF; // White color in hexadecimal
+        solver.objects[i].radius = BALL_RADIUS;
+        solver.objects[i].color[0] = arc4random_uniform(256);
+        solver.objects[i].color[1] = arc4random_uniform(256);
+        solver.objects[i].color[2] = arc4random_uniform(256);
+    };
 
-        // Assign functions to function pointers
-        solver.objects[i].update = objectUpdate;
-        solver.objects[i].accelerate = accelerate;
-        solver.objects[i].getVelocity = getVelocity;
-    }
-
-
-    // Opening file
+    // Open the CSV file for writing
     FILE *file = fopen("simulation_data.csv", "w");
     if (!file) {
         printf("Error opening file!\n");
-        exit(1);
-    }
-    fprintf(file, "Time,Object Type,Object Index,Position X,Position Y\n");
+        free(solver.objects);
+        return 1;
+    };
+    fprintf(file, "Time,Object Type,Object Index,Position X,Position Y,Radius,Color R,Color G,Color B\n");
 
     // Run the simulation for a few steps
-    printf("Running simulation...\n");
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < NUMBER_STEPS; i++) {
         simuUpdate(&solver);
-        for (size_t j = 0; j < solver.object_count; j++) {
-            printf("Object %zu - Time: %f, Position: (%f, %f), Last Position: (%f, %f), Acceleration: (%f, %f)\n", j, solver.time, solver.objects[j].position.x, solver.objects[j].position.y,
-            solver.objects[j].position_last.x, solver.objects[j].position_last.y,
-            solver.objects[j].acceleration.x, solver.objects[j].acceleration.y);
-
-        }
+        // Write the current state to the CSV file
         WriteSimulationData(file, solver.time, &solver);
     }
 
+    // Close the file and free memory
+    fclose(file);
     free(solver.objects);
     return 0;
 }

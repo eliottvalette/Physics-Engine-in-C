@@ -6,18 +6,21 @@ import time
 
 # Constants for the Pygame window
 WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 600
+WINDOW_HEIGHT = 800
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
-FPS = 5.0  # Frames per second
+FPS = 60.0  # Frames per second
 
 # Load the CSV file into a DataFrame
 simulation_df = pd.read_csv("simulation_data.csv")
 print('There will be a total of', len(np.unique(simulation_df['Time'])), 'steps')
 
-def draw_particle(screen, x, y):
-    pygame.draw.circle(screen, (rd.randint(0, 255), rd.randint(0, 255), rd.randint(0, 255)), (int(x), int(y)), 5)
+def draw_particle(screen, x, y, radius = 5, color = None):
+    if color is None :
+        color = (rd.randint(0, 255), rd.randint(0, 255), rd.randint(0, 255))
+    pygame.draw.circle(screen, color, (int(x), int(WINDOW_HEIGHT - y)), radius)
 
 def draw_rigid_body(screen, x, y, angle, width, height):
     points = [
@@ -40,15 +43,8 @@ def get_max_min(df):
     min_y = df['Position Y'].min()
     return max_x, min_x, max_y, min_y
 
-def normalize_and_scale(var, min_val, max_val, is_width):
-    padding = 0.1
-    if max_val == min_val: # Avoid division by zero
-        return WINDOW_WIDTH / 2 if is_width else WINDOW_HEIGHT / 2
-    normalized = (var - min_val) / (max_val - min_val)
-    if is_width:
-        return padding * WINDOW_WIDTH + (1 - 2 * padding) * WINDOW_WIDTH * normalized # pad left, pad right, and scale
-    else:
-        return WINDOW_HEIGHT * (1 - padding) - (1 - 2 * padding) * WINDOW_HEIGHT * normalized # due to the inverted y-axis in pygame
+def center_scene(var):
+    return var +  WINDOW_HEIGHT // 2
 
 def run_visualization(simulation_df):
     pygame.init()
@@ -58,13 +54,12 @@ def run_visualization(simulation_df):
 
     time_values = simulation_df['Time'].unique()
     dt = np.diff(time_values)[0] if len(time_values) > 1 else 1  # Set dt to 1 if there's only one time value
-    max_x, min_x, max_y, min_y = get_max_min(simulation_df)
-
     current_time = time_values[0]
     running = True
 
     while running:
         screen.fill(WHITE)
+        pygame.draw.circle(screen, BLACK, (center_scene(0), center_scene(0)), 350) # what radius should i choose ?
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -76,8 +71,10 @@ def run_visualization(simulation_df):
         # Draw each object in the current frame
         for _, data in current_frame_data.iterrows():
             obj_type = data['Object Type']
-            x = normalize_and_scale(data['Position X'], min_x, max_x, is_width=True)
-            y = normalize_and_scale(data['Position Y'], min_y, max_y, is_width=False)
+            x = center_scene(data['Position X'])
+            y = center_scene(data['Position Y'])
+            radius = data['Radius']
+            color = (data['Color R'], data['Color G'], data['Color B'])
             
             if obj_type == "Particle":
                 draw_particle(screen, x, y)
@@ -87,7 +84,7 @@ def run_visualization(simulation_df):
                 height = data['Height']
                 draw_rigid_body(screen, x, y, angle, width, height)
             elif obj_type == " RainbowParticles":
-                draw_particle(screen, x, y)
+                draw_particle(screen, x, y, radius, color)
 
 
         pygame.display.flip()
