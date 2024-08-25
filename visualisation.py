@@ -11,11 +11,12 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
-FPS = 60.0  # Frames per second
+FPS = 200.0  # Frames per second
 
 # Load the CSV file into a DataFrame
 simulation_df = pd.read_csv("simulation_data.csv")
-print(f'There will be a total of {len(np.unique(simulation_df["Time"]))} steps')
+nb_steps = len(np.unique(simulation_df["Time"]))
+print(f'There will be a total of {nb_steps} steps')
 
 # Dictionary to store the trail positions for each object
 trails = {}
@@ -68,7 +69,7 @@ def process_pendulum(screen, pendulum_data):
         trails[object_index].append((x2, y2))
 
         # Limit the length of the trail
-        if len(trails[object_index]) > 100:  # Adjust trail length as needed
+        if len(trails[object_index]) > nb_steps // 10:  # Adjust trail length as needed
             trails[object_index].pop(0)
 
 def draw_trails(screen, pendulum_data):

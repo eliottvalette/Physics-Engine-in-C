@@ -6,7 +6,7 @@
 #include <math.h>
 
 #define SUB_STEPS 2
-#define NUMBER_STEPS 2000
+#define NUMBER_STEPS 20000
 #define NUMBER_OF_OBJECTS 3
 #define BALL_RADIUS 12.0f
 
@@ -148,7 +148,7 @@ int main() {
     // Initialize a Solver
     Solver solver;
     solver.time = 0.0f;
-    solver.frame_dt = 1.0f / 10.0f; // FPS
+    solver.frame_dt = 1.0f / 60.0f; // FPS
     solver.sub_steps = SUB_STEPS;
     solver.gravity = (Vector2){0.0f, -9.8f}; // Gravity
     solver.object_count = NUMBER_OF_OBJECTS;
@@ -163,7 +163,7 @@ int main() {
 
     for (unsigned int i = 0; i < solver.object_count; i++){
         // Initialize the object
-        solver.objects[i].position = (Vector2){-200.0f + arc4random_uniform(400), -200.0f + arc4random_uniform(400)};
+        solver.objects[i].position = (Vector2){-1.0f, 1.0f}; // random on x and up on y
         solver.objects[i].position_last = solver.objects[i].position;
         solver.objects[i].acceleration = (Vector2){0.0f, 0.0f};
         solver.objects[i].radius = BALL_RADIUS;
