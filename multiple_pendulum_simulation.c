@@ -1,5 +1,5 @@
-// gcc -o physics_engine_solver_2 physics_engine_solver_2.c 
-// ./physics_engine_solver_2
+// gcc -o multiple_pendulum_simulation multiple_pendulum_simulation.c 
+// ./multiple_pendulum_simulation
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +7,7 @@
 
 #define SUB_STEPS 2
 #define NUMBER_STEPS 20000
-#define NUMBER_OF_OBJECTS 4
+#define NUMBER_OF_OBJECTS 3
 #define BALL_RADIUS 12.0f
 
 // Two-dimensional vector.
@@ -82,7 +82,7 @@ void apply_constraint(Solver *solver) {
     float dist = sqrt(to_obj.x * to_obj.x + to_obj.y * to_obj.y);
 
     float max_distance = rods_size - obj->radius;
-    if  (dist != max_distance) {
+    if  (fabs(dist - max_distance) > 1e-5) {
         // Normalize the to_obj vector to get the direction
         Vector2 to_obj_norm;
         to_obj_norm.x = to_obj.x / dist;
@@ -104,7 +104,7 @@ void apply_constraint(Solver *solver) {
         to_obj.y = obj_next->position.y - obj_prev->position.y;
 
         float dist = sqrt(to_obj.x * to_obj.x + to_obj.y * to_obj.y);        
-        if  (dist != max_distance) {
+        if  (fabs(dist - max_distance) > 1e-5) {
             // Normalize the to_obj vector to get the direction
             Vector2 to_obj_norm;
             to_obj_norm.x = to_obj.x / dist;
@@ -163,13 +163,13 @@ int main() {
 
     for (unsigned int i = 0; i < solver.object_count; i++){
         // Initialize the object
-        solver.objects[i].position = (Vector2){-1.0f, 1.0f}; // random on x and up on y
+        solver.objects[i].position = (Vector2){rand() % 2, rand() % 2};
         solver.objects[i].position_last = solver.objects[i].position;
         solver.objects[i].acceleration = (Vector2){0.0f, 0.0f};
         solver.objects[i].radius = BALL_RADIUS;
-        solver.objects[i].color[0] = arc4random_uniform(256);
-        solver.objects[i].color[1] = arc4random_uniform(256);
-        solver.objects[i].color[2] = arc4random_uniform(256);
+        solver.objects[i].color[0] = rand() % 256;
+        solver.objects[i].color[1] = rand() % 256;
+        solver.objects[i].color[2] = rand() % 256;
     };
 
     // Open the CSV file for writing
