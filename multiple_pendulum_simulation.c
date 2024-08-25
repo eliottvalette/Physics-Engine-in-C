@@ -6,10 +6,9 @@
 #include <math.h>
 
 #define SUB_STEPS 2
-#define NUMBER_STEPS 200
-#define NUMBER_OF_OBJECTS 300
+#define NUMBER_STEPS 2000
+#define NUMBER_OF_OBJECTS 3
 #define BALL_RADIUS 12.0f
-
 
 // Two-dimensional vector.
 typedef struct {
@@ -70,63 +69,53 @@ void applyForce(Solver *solver, Vector2 force){
 }
 
 void apply_constraint(Solver *solver) {
-    for (size_t i = 0; i < solver->object_count; i++) {
-        VerletObject *obj = &solver->objects[i];
-        float circle_radius = 350.0f;
-        Vector2 circle_center = {0.0f, 0.0f};
+    // connect the first node to the center of the circle
+    VerletObject *obj = &solver->objects[0];
+    float rods_size = 300.0f / NUMBER_OF_OBJECTS;
+    Vector2 pendulum_center = {0.0f, 0.0f};
 
-        // Vector from the circle center to the object
+    // Vector from the center of the circle
+    Vector2 to_obj;
+    to_obj.x = obj->position.x - pendulum_center.x;
+    to_obj.y = obj->position.y - pendulum_center.y;
+
+    float dist = sqrt(to_obj.x * to_obj.x + to_obj.y * to_obj.y);
+
+    float max_distance = rods_size - obj->radius;
+    if  (dist != max_distance) {
+        // Normalize the to_obj vector to get the direction
+        Vector2 to_obj_norm;
+        to_obj_norm.x = to_obj.x / dist;
+        to_obj_norm.y = to_obj.y / dist;
+
+        // Correct the position to be on the boundary
+        obj->position.x = pendulum_center.x + to_obj_norm.x * max_distance;
+        obj->position.y = pendulum_center.y + to_obj_norm.y * max_distance;            
+    };
+    
+    // Connect each node to the previous node
+    for (size_t i = 1; i < solver->object_count; i++) {
+        VerletObject *obj_prev = &solver->objects[i-1];
+        VerletObject *obj_next = &solver->objects[i];
+
+        // Vector from the previous node
         Vector2 to_obj;
-        to_obj.x = obj->position.x - circle_center.x;
-        to_obj.y = obj->position.y - circle_center.y;
+        to_obj.x = obj_next->position.x - obj_prev->position.x;
+        to_obj.y = obj_next->position.y - obj_prev->position.y;
 
-
-        float dist = sqrt(to_obj.x * to_obj.x + to_obj.y * to_obj.y);
-
-        // Check if the object is outside the allowed circle
-        float max_distance = circle_radius - obj->radius;
-        if  (dist > max_distance) {
+        float dist = sqrt(to_obj.x * to_obj.x + to_obj.y * to_obj.y);        
+        if  (dist != max_distance) {
             // Normalize the to_obj vector to get the direction
             Vector2 to_obj_norm;
             to_obj_norm.x = to_obj.x / dist;
             to_obj_norm.y = to_obj.y / dist;
 
             // Correct the position to be on the boundary
-            obj->position.x = circle_center.x + to_obj_norm.x * max_distance;
-            obj->position.y = circle_center.y + to_obj_norm.y * max_distance;            
+            obj_next->position.x = obj_prev->position.x + to_obj_norm.x * max_distance;
+            obj_next->position.y = obj_prev->position.y + to_obj_norm.y * max_distance;            
         };
-
     };
 };
-
-void checkCollisions(Solver *solver, float dt){
-        const float response_coef = 0.75f;
-        // Iterate on all objects
-        for (unsigned int i = 0; i < solver->object_count; ++i) {
-            VerletObject *obj_1 = &solver->objects[i];
-            // Iterate on object involved in new collision pairs
-            for (unsigned int k = i + 1; k < solver->object_count; ++k) {
-                VerletObject *obj_2 = &solver->objects[k];
-                const Vector2 v = {obj_1->position.x - obj_2->position.x, obj_1->position.y - obj_2->position.y};
-                const float        dist2    = v.x * v.x + v.y * v.y;
-                const float        min_dist = obj_1->radius + obj_2->radius;
-                // Check overlapping
-                if (dist2 < min_dist * min_dist) {
-                    const float dist = sqrt(dist2);
-                    const Vector2 n  = {v.x / dist, v.y / dist};
-                    const float mass_ratio_1 = obj_1->radius / (obj_1->radius + obj_2->radius);
-                    const float mass_ratio_2 = obj_2->radius / (obj_1->radius + obj_2->radius);
-                    const float delta        = 0.5f * response_coef * (dist - min_dist);
-                    // Update positions
-                    obj_1->position.x -= n.x * (mass_ratio_2 * delta);
-                    obj_1->position.y -= n.y * (mass_ratio_2 * delta);
-
-                    obj_2->position.x += n.x * (mass_ratio_1 * delta);
-                    obj_2->position.y += n.y * (mass_ratio_1 * delta);
-            }
-        }
-    }
-}
 
 // Update the simulation state
 void simuUpdate(Solver *solver) {
@@ -136,7 +125,6 @@ void simuUpdate(Solver *solver) {
         // Apply gravity
         applyGravity(solver);
         applyForce(solver, (Vector2){0.0f, 0.0f});
-        checkCollisions(solver, step_dt);
         apply_constraint(solver);
 
         // Update all objects
@@ -151,7 +139,7 @@ void simuUpdate(Solver *solver) {
 void WriteSimulationData(FILE *file, float time, Solver *solver) {
     for (size_t i = 0; i < solver->object_count; i++) {
         VerletObject *obj = &solver->objects[i];
-        fprintf(file, "%.2f, RainbowParticles, %zu, %.2f, %.2f, %.2f,%d,%d,%d\n",
+        fprintf(file, "%.2f, Pendulum, %zu, %.2f, %.2f, %.2f,%d,%d,%d\n",
                 time, i, obj->position.x, obj->position.y, obj->radius, obj->color[0], obj->color[1], obj->color[2]);
     };
 };
