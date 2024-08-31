@@ -7,7 +7,7 @@
 
 #define SUB_STEPS 2
 #define NUMBER_STEPS 20000
-#define NUMBER_OF_OBJECTS 3
+#define NUMBER_OF_OBJECTS 2
 #define BALL_RADIUS 12.0f
 
 // Two-dimensional vector.

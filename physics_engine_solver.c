@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define SUB_STEPS 2
+#define SUB_STEPS 5
 #define NUMBER_STEPS 2000
-#define NUMBER_OF_OBJECTS 300
-#define BALL_RADIUS 12.0f
+#define NUMBER_OF_OBJECTS 400
+#define BALL_RADIUS 10.0f
 
 
 // Two-dimensional vector.
@@ -163,8 +163,9 @@ void simuUpdate(Solver *solver) {
     for (unsigned int i = 0; i < solver->sub_steps; i++) {
         // Apply gravity
         applyGravity(solver);
-        // Apply force
-        applyForce(solver, (Vector2){0.0f, 0.0f});
+        // Apply variable wind
+        Vector2 wind_force = {0.0f, 0.0f}; // tune as you wish with 10.0f * sin(solver->time / 3)
+        applyForce(solver, wind_force);
         // Check collisions
         checkCollisions(solver, step_dt);
         // Apply constraint

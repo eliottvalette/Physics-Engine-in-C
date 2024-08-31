@@ -5,18 +5,19 @@ import numpy as np
 import time
 
 # Constants for the Pygame window
-WINDOW_WIDTH = 800
+WINDOW_WIDTH  = 800
 WINDOW_HEIGHT = 800
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-BLUE = (0, 0, 255)
-RED = (255, 0, 0)
-FPS = 600.0  # Frames per second
+BLUE  = (0, 0, 255)
+RED   = (255, 0, 0)
+FPS   = 600.0  # Frames per second
 
 # Load the CSV file into a DataFrame
 simulation_df = pd.read_csv("simulation_data.csv")
 nb_steps = len(np.unique(simulation_df["Time"]))
 print(f'There will be a total of {nb_steps} steps')
+
 
 # Dictionary to store the trail positions for each object
 trails = {}
@@ -140,3 +141,4 @@ def run_visualization(simulation_df):
 
 if __name__ == "__main__":
     run_visualization(simulation_df)
+fix
