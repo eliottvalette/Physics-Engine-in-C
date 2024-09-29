@@ -2,3 +2,4 @@ multiple_pendulum_simulation
 physics_engine_naive
 physics_engine_solver
 .vscode
+.venv

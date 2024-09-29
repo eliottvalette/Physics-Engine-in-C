@@ -141,4 +141,3 @@ def run_visualization(simulation_df):
 
 if __name__ == "__main__":
     run_visualization(simulation_df)
-fix
